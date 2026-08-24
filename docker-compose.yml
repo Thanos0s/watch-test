@@ -1,0 +1,57 @@
+# PrakritiDesk kiosk edge deployment.
+#
+# Usage:
+#   1. Create a `.env` file next to this docker-compose.yml (same directory)
+#      with at least GROQ_API_KEY=... -- Compose loads it automatically.
+#   2. docker compose up --build -d
+#
+# The container binds to 0.0.0.0:8001 inside; host port 8001 is mapped below.
+
+services:
+  intake-engine:
+    build:
+      context: ./intake-engine
+      dockerfile: Dockerfile
+    image: prakritidesk/intake-engine:latest
+    container_name: prakritidesk-intake-engine
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    volumes:
+      # SQLite database (app/database.py) -- persists patient session/queue
+      # state across container restarts and image rebuilds.
+      - ./data:/app/data
+      # Reserved for persisted prescription uploads / audit copies. The
+      # current /prescription/upload endpoint processes files in-memory
+      # only and does not yet write here -- this mount is in place so that
+      # can be added later without a compose/volume change.
+      - ./uploads:/app/uploads
+    environment:
+      # --- Required ---
+      GROQ_API_KEY: ${GROQ_API_KEY:?GROQ_API_KEY must be set in .env}
+      GROQ_MODEL: ${GROQ_MODEL:-llama-3.1-8b-instant}
+
+      # --- Fallback / offline local model settings ---
+      # app/graph.py and app/ocr_engine.py call Groq's cloud API directly
+      # today and do not yet read these; they're provided here as the
+      # config surface for wiring in a local Ollama/vLLM endpoint (e.g. for
+      # kiosk sites with unreliable internet) without another compose change.
+      LOCAL_LLM_ENABLED: ${LOCAL_LLM_ENABLED:-false}
+      LOCAL_LLM_BASE_URL: ${LOCAL_LLM_BASE_URL:-http://host.docker.internal:11434}
+      LOCAL_LLM_MODEL: ${LOCAL_LLM_MODEL:-llama3.1:8b}
+
+      # --- Persistence ---
+      # Absolute path so it resolves inside the container regardless of
+      # WORKDIR; must live under the /app/data bind mount above to persist.
+      DATABASE_URL: sqlite+aiosqlite:////app/data/prakritidesk.db
+
+      # --- Optional: Bhashini ASR/TTS (app/audio_engine.py) ---
+      BHASHINI_USER_ID: ${BHASHINI_USER_ID:-}
+      BHASHINI_API_KEY: ${BHASHINI_API_KEY:-}
+      BHASHINI_PIPELINE_ID: ${BHASHINI_PIPELINE_ID:-64392f96daac500b55c543cd}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3

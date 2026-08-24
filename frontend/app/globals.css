@@ -1,0 +1,32 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Kiosk touch-screen base styling: this app runs full-screen on a
+   dedicated OPD kiosk device, not a general-purpose browser tab, so it
+   deliberately suppresses interactions (text selection, callouts, pinch
+   zoom, pull-to-refresh) that make sense on a phone/desktop but not on a
+   walk-up touch terminal. */
+html,
+body {
+  height: 100%;
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+body {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Form fields and any text explicitly marked selectable (e.g. the doctor's
+   read-only raw-OCR-text panels) still need normal text interaction. */
+input,
+textarea,
+[contenteditable="true"],
+.selectable {
+  -webkit-user-select: text;
+  user-select: text;
+}
