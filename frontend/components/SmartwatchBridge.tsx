@@ -297,18 +297,32 @@ export default function SmartwatchBridge({
     setErrorMessage(null);
     setConnectionState("requesting");
 
-    try {
-      const options: BleRequestDeviceOptions = scanAll
-        ? {
-            acceptAllDevices: true,
-            optionalServices: [HEART_RATE_SERVICE, PULSE_OXIMETER_SERVICE, 0x180d, 0x1822],
-          }
-        : {
-            filters: [{ services: [HEART_RATE_SERVICE] }],
-            optionalServices: [PULSE_OXIMETER_SERVICE],
-          };
+    const options: BleRequestDeviceOptions = scanAll
+      ? {
+          acceptAllDevices: true,
+          optionalServices: [HEART_RATE_SERVICE, PULSE_OXIMETER_SERVICE, 0x180d, 0x1822],
+        }
+      : {
+          filters: [{ services: [HEART_RATE_SERVICE] }],
+          optionalServices: [PULSE_OXIMETER_SERVICE],
+        };
 
-      const device = await bluetoothApi.requestDevice(options);
+    let device: BleDevice;
+    try {
+      device = await bluetoothApi.requestDevice(options);
+    } catch (err) {
+      // User cancelling the chooser throws DOMException NotFoundError
+      const isCancellation = err instanceof DOMException && err.name === "NotFoundError";
+      if (!isCancellation) {
+        setErrorMessage(err instanceof Error ? err.message : "Bluetooth request failed.");
+        setConnectionState("error");
+      } else {
+        setConnectionState("idle");
+      }
+      return;
+    }
+
+    try {
       deviceRef.current = device;
       setDeviceName(device.name ?? "Paired device");
 
@@ -318,7 +332,15 @@ export default function SmartwatchBridge({
       const server = await device.gatt?.connect();
       if (!server) throw new Error("GATT connect() returned no server");
 
-      const heartRateService = await server.getPrimaryService(HEART_RATE_SERVICE);
+      let heartRateService: BleService;
+      try {
+        heartRateService = await server.getPrimaryService(HEART_RATE_SERVICE);
+      } catch {
+        throw new Error(
+          `Connected to "${device.name || "Device"}", but this device does not expose the standard BLE Heart Rate Service (0x180D).`
+        );
+      }
+
       const heartRateCharacteristic = await heartRateService.getCharacteristic(
         HEART_RATE_MEASUREMENT_CHARACTERISTIC
       );
@@ -348,15 +370,8 @@ export default function SmartwatchBridge({
 
       setConnectionState("connected");
     } catch (err) {
-      // A user backing out of the device chooser throws NotFoundError --
-      // that's a cancellation, not a real error, so just reset quietly.
-      const isCancellation = err instanceof DOMException && err.name === "NotFoundError";
-      if (!isCancellation) {
-        setErrorMessage(err instanceof Error ? err.message : "Could not pair with the device.");
-        setConnectionState("error");
-      } else {
-        setConnectionState("idle");
-      }
+      setErrorMessage(err instanceof Error ? err.message : "Could not communicate with the device.");
+      setConnectionState("error");
     }
   }, [bluetoothApi, handleDisconnect, handleHeartRateNotification, handlePulseOxNotification]);
 
