@@ -1,4 +1,6 @@
 import logging
+import os
+import sys
 
 from dotenv import load_dotenv
 
@@ -17,6 +19,8 @@ from .routes.auth import router as auth_router
 from .routes.queue import router as queue_router
 from .routes.vitals import router as vitals_router
 from .schema import ClinicalState, TurnResponse
+
+
 
 logger = logging.getLogger("prakritidesk.intake")
 
