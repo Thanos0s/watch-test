@@ -54,11 +54,18 @@ USER appuser
 
 EXPOSE 8001
 
+# Cache-bust label — increment this to force Railway to rebuild rather than
+# reusing a stale cached image when only config files (railway.toml) changed.
+LABEL build.version="2"
+
 # PORT is injected by Railway (and other PaaS platforms). Falls back to 8001
 # for local docker run / docker-compose where PORT is not set.
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD ["python", "-c", "import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:' + os.environ.get('PORT','8001') + '/', timeout=3)"]
+# start-period=60s gives heavy Python imports (numpy/opencv/langgraph) time
+# to finish loading before Docker starts counting healthcheck failures.
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD ["python", "-c", "import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:' + os.environ.get('PORT','8001') + '/', timeout=5)"]
 
 # JSON array form (suppresses JSONArgsRecommended lint). sh -c is required so
 # the shell expands ${PORT:-8001} -- JSON exec form does NOT expand shell vars.
 CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8001}"]
+
