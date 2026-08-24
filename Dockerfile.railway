@@ -1,0 +1,41 @@
+# Railway deployment Dockerfile -- build context is the REPO ROOT.
+# Mirrors intake-engine/Dockerfile exactly except COPY paths are prefixed
+# with intake-engine/ since Docker sees the whole repo, not just that subdir.
+# Local docker-compose still uses intake-engine/Dockerfile (context = ./intake-engine).
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgl1 \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender1 \
+    libgomp1 \
+    tesseract-ocr \
+    tesseract-ocr-hin \
+    && rm -rf /var/lib/apt/lists/*
+
+# Paths are relative to repo root (Railway build context)
+COPY intake-engine/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY intake-engine/app ./app
+
+RUN mkdir -p /app/data
+
+RUN useradd --create-home --uid 1000 appuser && chown -R appuser:appuser /app
+USER appuser
+
+EXPOSE 8001
+
+# PORT is injected by Railway. Falls back to 8001 for local docker run.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD python -c "import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:' + os.environ.get('PORT','8001') + '/', timeout=3)" || exit 1
+
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8001}"]
