@@ -589,7 +589,7 @@ export default function KioskUI({
         )}
         <div className="flex w-full max-w-md flex-col gap-4">
           <BigButton onClick={() => void sendOtp()} disabled={abhaId.trim().length < 4 || isSendingOtp}>
-            {isSendingOtp ? "Sending OTP..." : "Continue with ABHA ➜"}
+            {isSendingOtp ? "Sending OTP..." : "Continue ➜"}
           </BigButton>
           <button
             type="button"
