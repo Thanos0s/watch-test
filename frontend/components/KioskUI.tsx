@@ -306,6 +306,12 @@ export default function KioskUI({
     }
   }, [apiBaseUrl, otpTxnId, otpValue]);
 
+  const handleBypassCheckin = useCallback(() => {
+    const fallbackId = abhaId.trim() || `GUEST-${Math.floor(100000 + Math.random() * 900000)}`;
+    setAbhaId(fallbackId);
+    setScreen("consent");
+  }, [abhaId]);
+
   // ------------------------------------------------------------------
   // Conversational intake
   // ------------------------------------------------------------------
@@ -569,11 +575,29 @@ export default function KioskUI({
           className="w-full max-w-md rounded-2xl border-4 border-slate-700 bg-slate-900 px-6 py-5
             text-center text-2xl tracking-widest text-white placeholder:text-slate-500 focus:border-blue-500 focus:outline-none"
         />
-        {otpError && <p className="max-w-md text-center text-red-400">{otpError}</p>}
-        <div className="w-full max-w-md">
+        {otpError && (
+          <div className="flex max-w-md flex-col items-center gap-2">
+            <p className="text-center text-red-400">{otpError}</p>
+            <button
+              type="button"
+              onClick={handleBypassCheckin}
+              className="text-sm font-semibold text-amber-400 underline hover:text-amber-300"
+            >
+              ⚡ Server offline? Click here to bypass and continue as Guest
+            </button>
+          </div>
+        )}
+        <div className="flex w-full max-w-md flex-col gap-4">
           <BigButton onClick={() => void sendOtp()} disabled={abhaId.trim().length < 4 || isSendingOtp}>
-            {isSendingOtp ? "Sending OTP..." : "Continue ➜"}
+            {isSendingOtp ? "Sending OTP..." : "Continue with ABHA ➜"}
           </BigButton>
+          <button
+            type="button"
+            onClick={handleBypassCheckin}
+            className="w-full rounded-2xl border-2 border-slate-700 bg-slate-900/80 px-6 py-4 text-lg font-medium text-slate-300 transition-colors hover:border-slate-500 hover:bg-slate-800 hover:text-white"
+          >
+            ⚡ Continue as Guest (Skip ABHA) ➜
+          </button>
         </div>
       </div>
     );
@@ -611,13 +635,22 @@ export default function KioskUI({
             {isVerifyingOtp ? "Verifying..." : "Verify ➜"}
           </BigButton>
         </div>
-        <button
-          type="button"
-          onClick={() => setScreen("checkin")}
-          className="text-sm text-slate-500 hover:text-slate-300"
-        >
-          ← Back
-        </button>
+        <div className="flex flex-col items-center gap-3">
+          <button
+            type="button"
+            onClick={handleBypassCheckin}
+            className="text-sm font-semibold text-blue-400 hover:text-blue-300 underline"
+          >
+            ⚡ Skip OTP (Continue as Guest) ➜
+          </button>
+          <button
+            type="button"
+            onClick={() => setScreen("checkin")}
+            className="text-sm text-slate-500 hover:text-slate-300"
+          >
+            ← Back
+          </button>
+        </div>
       </div>
     );
   }
