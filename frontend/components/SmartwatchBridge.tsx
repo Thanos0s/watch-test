@@ -61,6 +61,7 @@ interface BleRequestDeviceFilter {
 interface BleRequestDeviceOptions {
   filters?: BleRequestDeviceFilter[];
   optionalServices?: (string | number)[];
+  acceptAllDevices?: boolean;
 }
 
 interface BluetoothApi {
@@ -291,16 +292,23 @@ export default function SmartwatchBridge({
     setSyncStatus("idle");
   }, [handleHeartRateNotification, handlePulseOxNotification]);
 
-  const handlePair = useCallback(async () => {
+  const handlePair = useCallback(async (scanAll = false) => {
     if (!bluetoothApi) return;
     setErrorMessage(null);
     setConnectionState("requesting");
 
     try {
-      const device = await bluetoothApi.requestDevice({
-        filters: [{ services: [HEART_RATE_SERVICE] }],
-        optionalServices: [PULSE_OXIMETER_SERVICE],
-      });
+      const options: BleRequestDeviceOptions = scanAll
+        ? {
+            acceptAllDevices: true,
+            optionalServices: [HEART_RATE_SERVICE, PULSE_OXIMETER_SERVICE, 0x180d, 0x1822],
+          }
+        : {
+            filters: [{ services: [HEART_RATE_SERVICE] }],
+            optionalServices: [PULSE_OXIMETER_SERVICE],
+          };
+
+      const device = await bluetoothApi.requestDevice(options);
       deviceRef.current = device;
       setDeviceName(device.name ?? "Paired device");
 
@@ -378,15 +386,28 @@ export default function SmartwatchBridge({
     return (
       <div className="flex flex-col items-center gap-4 rounded-2xl bg-slate-900 p-8 text-center">
         <div className="text-5xl">⌚</div>
-        <button
-          type="button"
-          onClick={() => void handlePair()}
-          disabled={connectionState === "requesting"}
-          className="min-h-[72px] w-full max-w-md rounded-2xl bg-blue-600 px-6 py-4 text-xl font-semibold text-white
-            shadow-lg transition-transform hover:bg-blue-500 active:scale-95 disabled:opacity-60"
-        >
-          {connectionState === "requesting" ? "Opening device chooser..." : "🔗 Tap to Pair Pulse Sensor / Smartwatch"}
-        </button>
+        <div className="flex w-full max-w-md flex-col gap-3">
+          <button
+            type="button"
+            onClick={() => void handlePair(false)}
+            disabled={connectionState === "requesting"}
+            className="min-h-[72px] w-full rounded-2xl bg-blue-600 px-6 py-4 text-xl font-semibold text-white
+              shadow-lg transition-transform hover:bg-blue-500 active:scale-95 disabled:opacity-60"
+          >
+            {connectionState === "requesting" ? "Opening device chooser..." : "🔗 Tap to Pair Pulse Sensor / Smartwatch"}
+          </button>
+          <button
+            type="button"
+            onClick={() => void handlePair(true)}
+            disabled={connectionState === "requesting"}
+            className="rounded-xl border border-slate-700 bg-slate-950/60 px-4 py-2.5 text-sm font-medium text-slate-300 hover:border-slate-500 hover:text-white"
+          >
+            🔍 Scan All Nearby Bluetooth Devices
+          </button>
+        </div>
+        <p className="max-w-md text-xs text-slate-400">
+          💡 <strong>Tip:</strong> Look at the <strong>top-left corner</strong> of your browser window (under the URL bar) for the pairing popup.
+        </p>
         {errorMessage && <p className="max-w-md text-sm text-red-400">{errorMessage}</p>}
       </div>
     );
